@@ -15,6 +15,7 @@ import {
 } from 'rxjs/operators';
 import {merge, fromEvent, Observable, concat} from 'rxjs';
 import {Lesson} from '../model/lesson';
+import { createHttpObservable } from '../common/util';
 
 
 @Component({
@@ -24,7 +25,11 @@ import {Lesson} from '../model/lesson';
 })
 export class CourseComponent implements OnInit, AfterViewInit {
 
+    courseId: string;
 
+    course$: Observable<Course>;
+
+    lessons$: Observable<Lesson[]>;
 
     @ViewChild('searchInput') input: ElementRef;
 
@@ -35,17 +40,47 @@ export class CourseComponent implements OnInit, AfterViewInit {
 
     ngOnInit() {
 
-        const courseId = this.route.snapshot.params['id'];
+        this.courseId = this.route.snapshot.params['id'];
 
+        this.course$ = createHttpObservable(`/api/courses/${this.courseId}`);
 
+        
 
     }
 
     ngAfterViewInit() {
 
+        // debounce is waiting for a value to become stable
+        // throttle - is for limiting output values from observable by an interval
 
+        this.lessons$ = fromEvent<any>(this.input.nativeElement, 'keyup')
+            .pipe(
+                map(event => event.target.value),
+                startWith(''),
+                debounceTime(400),
+                distinctUntilChanged(),
+                switchMap(search => this.loadLessons(search))
+            );
 
+        // const searchLessons$ = fromEvent<any>(this.input.nativeElement, 'keyup')
+        //     .pipe(
+        //         map(event => event.target.value),
+        //         debounceTime(400),
+        //         distinctUntilChanged(),
+        //         switchMap(search => this.loadLessons(search))
+        //     );
 
+        // const initialLessons$ = this.loadLessons();
+
+        // this.lessons$ = concat(initialLessons$, searchLessons$);
+    }
+
+    loadLessons(search = ''): Observable<Lesson[]> {
+        return createHttpObservable(
+            `/api/lessons?courseId=${this.courseId}&pageSize=100&filter=${search}`)
+        .pipe(
+            map(res => res.payload)
+        );
     }
 
 

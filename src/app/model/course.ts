@@ -9,3 +9,8 @@ export interface Course {
     category:string;
     lessonsCount:number;
 }
+
+export abstract class CourseCategory {
+    public static advanced: string = "ADVANCED";
+    public static beginner: string = "BEGINNER";
+}
