@@ -11,11 +11,12 @@ import {
     concatMap,
     switchMap,
     withLatestFrom,
-    concatAll, shareReplay
+    concatAll, shareReplay, first, take
 } from 'rxjs/operators';
-import {merge, fromEvent, Observable, concat} from 'rxjs';
+import {merge, fromEvent, Observable, concat, forkJoin} from 'rxjs';
 import {Lesson} from '../model/lesson';
 import {createHttpObservable} from '../common/util';
+import { Store } from '../common/store.service';
 
 
 @Component({
@@ -25,16 +26,18 @@ import {createHttpObservable} from '../common/util';
 })
 export class CourseComponent implements OnInit, AfterViewInit {
 
-    courseId:string;
+    courseId:number;
 
     course$ : Observable<Course>;
+
+    //course: Course;
 
     lessons$: Observable<Lesson[]>;
 
 
     @ViewChild('searchInput') input: ElementRef;
 
-    constructor(private route: ActivatedRoute) {
+    constructor(private route: ActivatedRoute, private store: Store) {
 
 
     }
@@ -43,13 +46,31 @@ export class CourseComponent implements OnInit, AfterViewInit {
 
         this.courseId = this.route.snapshot.params['id'];
 
-        this.course$ = createHttpObservable(`/api/courses/${this.courseId}`);
+        // can use first or take operators to force observable to complete after either the first emitted value
+        // taken after a given number of emitted values
+        this.course$ = this.store.selectCourseById(this.courseId)
+            .pipe(
+                take(1)
+            );
 
+        forkJoin(this.course$, this.loadLessons())
+            .subscribe(console.log);
+
+        //this.course$.subscribe(course => this.course = course);
+
+        this.loadLessons()
+                .pipe(
+                    withLatestFrom(this.course$)
+                )
+                .subscribe(([lessons, course]) => {
+                    console.log(`lessons${lessons}`);
+                    console.log(`course${course}`);
+                });
     }
 
     ngAfterViewInit() {
 
-        const searchLessons$ =  fromEvent<any>(this.input.nativeElement, 'keyup')
+        const searchLessons$ = fromEvent<any>(this.input.nativeElement, 'keyup')
             .pipe(
                 map(event => event.target.value),
                 debounceTime(400),
